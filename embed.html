@@ -1,0 +1,134 @@
+<html>
+	<head>
+		<script src="http://code.jquery.com/jquery-latest.js" type="text/javascript">
+		</script>
+		<link href="http://ajax.googleapis.com/ajax/libs/jqueryui/1.8/themes/base/jquery-ui.css" rel="stylesheet" type="text/css"/>
+		<script src="http://ajax.googleapis.com/ajax/libs/jqueryui/1.8/jquery-ui.min.js"></script>
+		<script type="text/javascript">
+
+
+		function getFrame(x, y, video) {
+
+			var grid = eval('grid'+video.id.toString());
+
+			var rows = grid.length;
+			var cols = grid[0].length;
+			return grid[Math.floor(y * rows)][Math.floor(x * cols)];
+		}
+
+		function indicator(evt) {
+			if ($('#indicator')[0]) {
+				document.body.removeChild(document.getElementById('indicator'));
+			}
+			var newdiv = document.createElement('div');
+			newdiv.id = 'indicator';
+			var body = document.getElementsByTagName('body')[0].appendChild(newdiv);
+			var indicator = document.getElementById('indicator')
+			indicator.setAttribute('style','top: '+(evt.pageY-25)+'px;'+'left: '+(evt.pageX-25)+'px;');
+			indicator.setAttribute('class','square');
+			$('#indicator').effect("pulsate", {times:1}, 200);
+			$('#indicator').fadeOut(1000);
+			//window.setTimeout(function () {$('#indicator').addClass('faded');},50);
+			//window.setTimeout(function () {document.body.removeChild(document.getElementById('indicator'))},1000);
+		}
+
+		function refocus(evt, video) {
+			indicator(evt);
+			var x = (evt.pageX - video.offsetLeft) / video.offsetWidth;
+			var y = (evt.pageY - video.offsetTop) / video.offsetHeight;
+			var next = (getFrame(x, y, video) / 30).toString();
+			video.playbackRate = 3;
+			video.currentTime = 0;
+			video.play();
+			setTimeout(function () {video.pause(); video.currentTime = next;}, next * 1000/3);
+			
+			//console.log(video.duration);
+			//drawGrid();
+		}
+
+		function drawGrid() {
+			alert($('#grid').style);
+			document.getElementById('grid').setAttribute('style', 'width: 500px; height: 500px; top: 0px; left: 0px; border:1px solid black; position: absolute; z-index: 990;');
+			console.log('hi');
+		}
+		</script>
+		<style type="text/css">
+
+		body {
+			text-align: center;
+			background-color: rgb(230,230,230);
+			font-family: "HelveticaNeue-Light", "Helvetica Neue Light", "Helvetica Neue", Helvetica, Arial, "Lucida Grande", sans-serif; 
+   			font-weight: 300;
+   			color: rgb(40,40,40);
+   			font-size: 30px;
+		}
+		.lfimg {
+			height: 1000px;
+			width: 900px;
+		}
+		.lfvid {
+			cursor: pointer;
+			display: block;
+			margin: 80px;
+			margin-top: 20px;
+			float: center;
+			height:auto;
+			width: auto;
+		}
+		.grid {
+			border: 1px solid rgba(220,230,245,.4);
+			padding: 0px;
+			margin: 0px;
+			z-index: 100;
+			position: absolute;
+		}
+		.square {
+			border-radius: 10px;
+			border: 1px solid rgb(210,210,255);
+			padding: 0px;
+			margin: 0px;
+			z-index: 100;
+			position: absolute;
+			width: 50px;
+			height:50px;
+			opacity: .6;
+			-webkit-transition: opacity 0s;
+		}
+
+		.square.faded {
+			opacity: 0;
+			border: 1px solid rgb(210,210,255);
+			-webkit-transition: all 1.5s;
+		}
+
+		</style>
+	</head>
+	<body> <br>Interactive focusable photo beta: <br>
+		Click to focus! <br> <br>
+	<center>
+	<?php echo 'hello';?>
+	<?php 
+		$files = glob('images/*.{m4v}', GLOB_BRACE);
+		foreach($files as $file) {
+			echo $file;
+		}
+	?>
+	<script src="images/0.js"></script>
+	<script src="images/1.js"></script>
+	<script src="images/2.js"></script>
+	<script src="images/3.js"></script>
+	<script src="images/4.js"></script>
+	<script src="images/5.js"></script>
+
+	<video id ="0" class ="lfvid" src="images/0.m4v" onclick="refocus(event, this);">
+	</video>
+	<video id ="1" class ="lfvid" src="images/1.m4v" onclick="refocus(event, this);"></video>
+	<video id ="2" class ="lfvid" src="images/2.m4v" onclick="refocus(event, this);"></video>
+	<video id ="3" class ="lfvid" src="images/3.m4v" onclick="refocus(event, this);"></video>
+	<video id ="4" class ="lfvid" src="images/4.m4v" onclick="refocus(event, this);"></video>
+	<video id ="5" class ="lfvid" src="images/5.m4v" onclick="refocus(event, this);"></video>
+
+
+	</center>
+	</body>
+</html>
