@@ -28,12 +28,8 @@
 	function imageDev($i, $minx, $maxx, $miny, $maxy) {
 		global $image_name;
 		$heap = new MySimpleHeap();
-		if($i < 10) {
-			$img = imagecreatefrompng($image_name.'_temp/0'.$i.'.png');
-		}
-		else {
-			$img = imagecreatefrompng($image_name.'_temp/'.$i.'.png');
-		}
+		$id = ($i < 10 ? '0' : '') . $i;
+		$img = imagecreatefrompng("temp/$image_name-$id.png");
 		$mins = 0;
 		$maxes = 0;
 		for ($y = $miny; $y < $maxy; $y += 2) {
@@ -65,7 +61,12 @@
 
 	function imageFit($r, $c) {
 		global $image_name;
-		$img = imagecreatefrompng($image_name.'_temp/01.png');
+
+		// create the stills
+		$dimString = exec("ffmpeg -i $id.m4v 2>&1 | egrep -o '\d{2,4}x\d{2,4}'");
+        exec("ffmpeg -y -i $image_name.m4v -vcodec png -s $dimString temp/$image_name-%02d.png");
+
+		$img = imagecreatefrompng("temp/$image_name-01.png");
 		$c = round(imagesx($img) / 50);
 		$r = round(imagesy($img) / 50);
 		$w = imagesx($img) / $c;
@@ -75,7 +76,7 @@
 		{
 			$output = $output.'[';
 			for($cc = 0; $cc < $c; $cc++) {
-				$output = $output.bestFit($cc * $w, $cc * $w + $w, $rr * $h, $rr * $h + $w);
+				$output = $output.bestFit($cc * $w, $cc * $w + $w - 1, $rr * $h, $rr * $h + $w - 1);
 				if($cc != $c - 1) {
 					$output = $output.',';
 				}
@@ -99,7 +100,7 @@
 	    return ((float)$usec + (float)$sec);
 	}
 
-	$image_name = $_GET['id'];
+	$image_name = '-1'; //$_GET['id'];
 	set_time_limit(900);
 	$time_start = microtime_float();
 
