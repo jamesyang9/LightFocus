@@ -10,6 +10,8 @@ import (
 	"io/ioutil"
 	"regexp"
 	"strconv"
+	"runtime"
+	_ "net/http/pprof"
 )
 
 type Video struct {
@@ -104,6 +106,7 @@ func handleUpload(writer http.ResponseWriter, req *http.Request) {
 
 func main(){
 	fmt.Println("Starting server...")
+	runtime.GOMAXPROCS(8)
 	http.Handle("/", http.FileServer(http.Dir("www")))
 	http.Handle("/upload", http.HandlerFunc(handleUpload))
 	http.ListenAndServe(":8000", nil)
