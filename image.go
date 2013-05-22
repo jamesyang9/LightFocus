@@ -7,7 +7,6 @@ import (
 	"regexp"
 	"strconv"
 	"container/heap"
-	"image"
 	"image/png"
 	"encoding/json"
 	"sync"
@@ -15,9 +14,10 @@ import (
 )
 
 var (
-	images     []image.Image
-	locks      []sync.Mutex
+	images     [][][]int
 	frames     int
+	width      int
+	height     int
 	tempdir    string
 )
 
@@ -27,18 +27,9 @@ func checkErr(e error){
 	}
 }
 
-func getIntensity(img *image.Image, x, y int) int {
-	r, g, b, _ := (*img).At(x, y).RGBA()
-	max := uint32(0xFFFF)
-	r = 255 * r / max
-	g = 255 * g / max
-	b = 255 * b / max
-	return int((r + g + b) / 3)
-}
-
-func calcDev(img *image.Image, x, y int) int {
-	a := getIntensity(img, x+1, y)
-	b := getIntensity(img, x, y)
+func calcDev(i, x, y int) int {
+	a := images[i-1][x+1][y]
+	b := images[i-1][x][y]
 	if a == 0 || b == 0 { 
 		return 0
 	}
@@ -52,20 +43,16 @@ func calcDev(img *image.Image, x, y int) int {
 func imageDev(id string, i, minx, maxx, miny, maxy int) int{
 	pq := &PriorityQueue{}
 	heap.Init(pq)
-	locks[i-1].Lock()
-	img := images[i-1]
-	imgptr := &img
 	maxes := 0
 	for y := miny; y < maxy; y += 2 {
 		for x := minx; x < maxx; x++ {
-			dev := calcDev(imgptr, x, y)
+			dev := calcDev(i, x, y)
 			item := &Item{
 				priority: dev,
 			}
 			heap.Push(pq, item)
 		}
 	}
-	locks[i-1].Unlock()
 	for i := 0; i < 12; i++ {
 		m := heap.Pop(pq).(*Item)
 		maxes += m.priority * m.priority * m.priority
@@ -104,6 +91,11 @@ func getDevJSON(id string) []byte {
 	}
 	dimensions := matches[0][0]
 
+	rx2, err := regexp.Compile(`(\d{2,4})x(\d{2,4})`)
+	matches = rx2.FindAllStringSubmatch(dimensions, -1)
+	width, err = strconv.Atoi(matches[0][1])
+	height, err = strconv.Atoi(matches[0][2])
+
 	// create a temporary directory for the frames
 	tempdir, err = ioutil.TempDir("temp", id)
 
@@ -126,8 +118,8 @@ func getDevJSON(id string) []byte {
 	frames, err = strconv.Atoi(matches[0][1])
 
 	// load file descriptors for all frame files
-	images = make([]image.Image, frames)
-	locks = make([]sync.Mutex, frames)
+	images = make([][][]int, frames)
+	max := uint32(0xFFFF)
 	for i := 1; i <= frames; i++ {
 		istr := strconv.FormatInt(int64(i), 10)
 		if i < 10 {
@@ -136,15 +128,21 @@ func getDevJSON(id string) []byte {
 		reader, err := os.Open(tempdir + "/" + id + "-" + istr + ".png")
 		checkErr(err)		
 		img, err := png.Decode(reader)
-		images[i-1] = img
-		locks[i-1] = sync.Mutex{}
+		images[i-1] = make([][]int, width)
+		for x := 0; x < width; x++ {
+			images[i-1][x] = make([]int, height)
+			for y := 0; y < height; y++ {
+				r, g, b, _ := img.At(x, y).RGBA()
+				r = 255 * r / max
+				g = 255 * g / max
+				b = 255 * b / max
+				images[i-1][x][y] = int((r + g + b) / 3)
+			}
+		}
+		reader.Close()
 	}
 
 	// find JS output table from frames
-	rx2, err := regexp.Compile(`(\d{2,4})x(\d{2,4})`)
-	matches = rx2.FindAllStringSubmatch(dimensions, -1)
-	width, err := strconv.Atoi(matches[0][1])
-	height, err := strconv.Atoi(matches[0][2])
 	
 	c := width / 50
 	r := height / 50
