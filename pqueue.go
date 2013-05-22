@@ -1,4 +1,4 @@
-// sample priority queue from Google's site
+// This example demonstrates a priority queue built using the heap interface.
 package main
 
 import "container/heap"
