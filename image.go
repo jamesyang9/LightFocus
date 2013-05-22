@@ -11,12 +11,14 @@ import (
 	"image/png"
 	"encoding/json"
 	"sync"
+	"io/ioutil"
 )
 
 var (
-	images []image.Image
-	locks []sync.Mutex
-	frames int
+	images     []image.Image
+	locks      []sync.Mutex
+	frames     int
+	tempdir    string
 )
 
 func checkErr(e error){
@@ -88,12 +90,13 @@ func bestFit(id string, minx, maxx, miny, maxy int) int {
 func getDevJSON(id string) []byte {
 	// TODO: check if file exists at requested ID
 
-	// generate stills from $id.mkv
+	// get dimensions of video from output of ffmpeg
 	cmd := exec.Command("ffmpeg", "-i", "www/images/" + id + ".m4v")
 	var dim bytes.Buffer
 	cmd.Stderr = &dim
 	err := cmd.Run()
 
+	// find dimensions in output w/ regex
 	rx, err := regexp.Compile(`\d{2,4}x\d{2,4}`)
 	matches := rx.FindAllStringSubmatch(dim.String(), -1)
 	if len(matches) == 0 || len(matches[0]) == 0 {
@@ -101,8 +104,12 @@ func getDevJSON(id string) []byte {
 	}
 	dimensions := matches[0][0]
 
+	// create a temporary directory for the frames
+	tempdir, err = ioutil.TempDir("temp", id)
+
+	// fill temp directory w/ frames
 	cmd = exec.Command("ffmpeg", "-y", "-i", "www/images/" + id + ".m4v", "-r", "24",
-		                "-vcodec", "png", "-s", dimensions, "temp/" + id + "-%02d.png")
+		                "-vcodec", "png", "-s", dimensions, tempdir + "/" + id + "-%02d.png")
 	var out bytes.Buffer
 	cmd.Stderr = &out
 	err = cmd.Run()
@@ -110,6 +117,7 @@ func getDevJSON(id string) []byte {
 		panic(err)
 	}
 	
+	// find number of frames generated
 	rx, err = regexp.Compile(`frame=   (\d{1,3})`)
 	matches = rx.FindAllStringSubmatch(out.String(), -1)
 	if len(matches) == 0 || len(matches[0]) == 0 {
@@ -117,7 +125,7 @@ func getDevJSON(id string) []byte {
 	}
 	frames, err = strconv.Atoi(matches[0][1])
 
-	// load all stills into memory
+	// load file descriptors for all frame files
 	images = make([]image.Image, frames)
 	locks = make([]sync.Mutex, frames)
 	for i := 1; i <= frames; i++ {
@@ -125,14 +133,14 @@ func getDevJSON(id string) []byte {
 		if i < 10 {
 			istr = "0" + istr
 		}	
-		reader, err := os.Open("temp/" + id + "-" + istr + ".png")
+		reader, err := os.Open(tempdir + "/" + id + "-" + istr + ".png")
 		checkErr(err)		
 		img, err := png.Decode(reader)
 		images[i-1] = img
 		locks[i-1] = sync.Mutex{}
 	}
 
-	// find JS output table from stills
+	// find JS output table from frames
 	rx2, err := regexp.Compile(`(\d{2,4})x(\d{2,4})`)
 	matches = rx2.FindAllStringSubmatch(dimensions, -1)
 	width, err := strconv.Atoi(matches[0][1])
@@ -144,6 +152,8 @@ func getDevJSON(id string) []byte {
 	h := float32(height) / float32(r)
 	grid := make([][]int, r)
 
+	// run each bestFit call in its own thread and 
+	// wait for them all to finish
 	var wg sync.WaitGroup
 	for rr := 0; rr < r; rr++ {
 		grid[rr] = make([]int, c)
@@ -158,6 +168,9 @@ func getDevJSON(id string) []byte {
 	}
 
 	wg.Wait()
+
+	// delete temporary directory
+	os.RemoveAll(tempdir)
 
 	jarr, err := json.Marshal(grid)
 	return jarr
